@@ -1,27 +1,326 @@
+import { ExistingBeach, GeoPosition } from '@src/models/beach';
+import { Forecast, ForecastProcessingInternalError } from '../forecast';
+
 import { StormGlass } from '@src/clients/stormGlass';
 import stormGlassNormalizedResponseFixture from '@test/fixtures/stormglass_normalized_response_3_hours.json';
-import {
-  Beach,
-  BeachPosition,
-  Forecast,
-  ForecastProcessingInternalError,
-} from '../forecast';
 
 jest.mock('@src/clients/stormGlass');
 
 describe('Forecast Service', () => {
+  const defaultBeaches: ExistingBeach[] = [
+    {
+      id: 'fake-id1',
+      lat: -33.792726,
+      lng: 151.289824,
+      name: 'Manly',
+      position: GeoPosition.E,
+      userId: 'fake-id',
+    },
+    {
+      id: 'fake-id2',
+      lat: -33.792726,
+      lng: 141.289824,
+      name: 'Dee Why',
+      position: GeoPosition.S,
+      userId: 'fake-id',
+    },
+  ];
   const mockedStormGlassService = new StormGlass() as jest.Mocked<StormGlass>;
+  it('should return the forecast for multiple beaches in the same hour with different ratings ordered by rating decreasing', async () => {
+    mockedStormGlassService.fetchPoints.mockResolvedValueOnce([
+      {
+        swellDirection: 123.41,
+        swellHeight: 0.21,
+        swellPeriod: 3.67,
+        time: '2020-04-26T00:00:00+00:00',
+        waveDirection: 232.12,
+        waveHeight: 0.46,
+        windDirection: 310.48,
+        windSpeed: 100,
+      },
+    ]);
+    mockedStormGlassService.fetchPoints.mockResolvedValueOnce([
+      {
+        swellDirection: 64.26,
+        swellHeight: 0.15,
+        swellPeriod: 13.89,
+        time: '2020-04-26T00:00:00+00:00',
+        waveDirection: 231.38,
+        waveHeight: 2.07,
+        windDirection: 299.45,
+        windSpeed: 100,
+      },
+    ]);
+    const expectedResponse = [
+      {
+        time: '2020-04-26T00:00:00+00:00',
+        forecast: [
+          {
+            lat: -33.792726,
+            lng: 141.289824,
+            name: 'Dee Why',
+            position: 'S',
+            rating: 3,
+            swellDirection: 64.26,
+            swellHeight: 0.15,
+            swellPeriod: 13.89,
+            time: '2020-04-26T00:00:00+00:00',
+            waveDirection: 231.38,
+            waveHeight: 2.07,
+            windDirection: 299.45,
+            windSpeed: 100,
+          },
+          {
+            lat: -33.792726,
+            lng: 151.289824,
+            name: 'Manly',
+            position: 'E',
+            rating: 2,
+            swellDirection: 123.41,
+            swellHeight: 0.21,
+            swellPeriod: 3.67,
+            time: '2020-04-26T00:00:00+00:00',
+            waveDirection: 232.12,
+            waveHeight: 0.46,
+            windDirection: 310.48,
+            windSpeed: 100,
+          },
+        ],
+      },
+    ];
+    const forecast = new Forecast(mockedStormGlassService);
+    const beachesWithRating = await forecast.processForecastForBeaches(
+      defaultBeaches,
+      'desc',
+      'rating'
+    );
+    expect(beachesWithRating).toEqual(expectedResponse);
+  });
+
+  it('should return the forecast for multiple beaches in the same hour with different ratings ordered by rating increasing', async () => {
+    mockedStormGlassService.fetchPoints.mockResolvedValueOnce([
+      {
+        swellDirection: 123.41,
+        swellHeight: 0.21,
+        swellPeriod: 3.67,
+        time: '2020-04-26T00:00:00+00:00',
+        waveDirection: 232.12,
+        waveHeight: 0.46,
+        windDirection: 310.48,
+        windSpeed: 100,
+      },
+    ]);
+    mockedStormGlassService.fetchPoints.mockResolvedValueOnce([
+      {
+        swellDirection: 64.26,
+        swellHeight: 0.15,
+        swellPeriod: 13.89,
+        time: '2020-04-26T00:00:00+00:00',
+        waveDirection: 231.38,
+        waveHeight: 2.07,
+        windDirection: 299.45,
+        windSpeed: 100,
+      },
+    ]);
+    const expectedResponse = [
+      {
+        time: '2020-04-26T00:00:00+00:00',
+        forecast: [
+          {
+            lat: -33.792726,
+            lng: 151.289824,
+            name: 'Manly',
+            position: 'E',
+            rating: 2,
+            swellDirection: 123.41,
+            swellHeight: 0.21,
+            swellPeriod: 3.67,
+            time: '2020-04-26T00:00:00+00:00',
+            waveDirection: 232.12,
+            waveHeight: 0.46,
+            windDirection: 310.48,
+            windSpeed: 100,
+          },
+          {
+            lat: -33.792726,
+            lng: 141.289824,
+            name: 'Dee Why',
+            position: 'S',
+            rating: 3,
+            swellDirection: 64.26,
+            swellHeight: 0.15,
+            swellPeriod: 13.89,
+            time: '2020-04-26T00:00:00+00:00',
+            waveDirection: 231.38,
+            waveHeight: 2.07,
+            windDirection: 299.45,
+            windSpeed: 100,
+          },
+        ],
+      },
+    ];
+    const forecast = new Forecast(mockedStormGlassService);
+    const beachesWithRating = await forecast.processForecastForBeaches(
+      defaultBeaches,
+      'asc',
+      'rating'
+    );
+    expect(beachesWithRating).toEqual(expectedResponse);
+  });
+
+  it('should return the forecast for mutiple beaches in the same hour with different lng ordered by increasing', async () => {
+    mockedStormGlassService.fetchPoints.mockResolvedValueOnce([
+      {
+        swellDirection: 123.41,
+        swellHeight: 0.21,
+        swellPeriod: 3.67,
+        time: '2020-04-26T00:00:00+00:00',
+        waveDirection: 232.12,
+        waveHeight: 0.46,
+        windDirection: 310.48,
+        windSpeed: 100,
+      },
+    ]);
+    mockedStormGlassService.fetchPoints.mockResolvedValueOnce([
+      {
+        swellDirection: 64.26,
+        swellHeight: 0.15,
+        swellPeriod: 13.89,
+        time: '2020-04-26T00:00:00+00:00',
+        waveDirection: 231.38,
+        waveHeight: 2.07,
+        windDirection: 299.45,
+        windSpeed: 100,
+      },
+    ]);
+    const expectedResponse = [
+      {
+        time: '2020-04-26T00:00:00+00:00',
+        forecast: [
+          {
+            lat: -33.792726,
+            lng: 141.289824,
+            name: 'Dee Why',
+            position: 'S',
+            rating: 3,
+            swellDirection: 64.26,
+            swellHeight: 0.15,
+            swellPeriod: 13.89,
+            time: '2020-04-26T00:00:00+00:00',
+            waveDirection: 231.38,
+            waveHeight: 2.07,
+            windDirection: 299.45,
+            windSpeed: 100,
+          },
+          {
+            lat: -33.792726,
+            lng: 151.289824,
+            name: 'Manly',
+            position: 'E',
+            rating: 2,
+            swellDirection: 123.41,
+            swellHeight: 0.21,
+            swellPeriod: 3.67,
+            time: '2020-04-26T00:00:00+00:00',
+            waveDirection: 232.12,
+            waveHeight: 0.46,
+            windDirection: 310.48,
+            windSpeed: 100,
+          },
+        ],
+      },
+    ];
+    const forecast = new Forecast(mockedStormGlassService);
+    const beachesWithRating = await forecast.processForecastForBeaches(
+      defaultBeaches,
+      'asc',
+      'lng'
+    );
+    expect(beachesWithRating).toEqual(expectedResponse);
+  });
+  it('should return the forecast for multiple beaches in the same hour with different lng ordered by decreasing', async () => {
+    mockedStormGlassService.fetchPoints.mockResolvedValueOnce([
+      {
+        swellDirection: 123.41,
+        swellHeight: 0.21,
+        swellPeriod: 3.67,
+        time: '2020-04-26T00:00:00+00:00',
+        waveDirection: 232.12,
+        waveHeight: 0.46,
+        windDirection: 310.48,
+        windSpeed: 100,
+      },
+    ]);
+    mockedStormGlassService.fetchPoints.mockResolvedValueOnce([
+      {
+        swellDirection: 64.26,
+        swellHeight: 0.15,
+        swellPeriod: 13.89,
+        time: '2020-04-26T00:00:00+00:00',
+        waveDirection: 231.38,
+        waveHeight: 2.07,
+        windDirection: 299.45,
+        windSpeed: 100,
+      },
+    ]);
+    const expectedResponse = [
+      {
+        time: '2020-04-26T00:00:00+00:00',
+        forecast: [
+          {
+            lat: -33.792726,
+            lng: 151.289824,
+            name: 'Manly',
+            position: 'E',
+            rating: 2,
+            swellDirection: 123.41,
+            swellHeight: 0.21,
+            swellPeriod: 3.67,
+            time: '2020-04-26T00:00:00+00:00',
+            waveDirection: 232.12,
+            waveHeight: 0.46,
+            windDirection: 310.48,
+            windSpeed: 100,
+          },
+          {
+            lat: -33.792726,
+            lng: 141.289824,
+            name: 'Dee Why',
+            position: 'S',
+            rating: 3,
+            swellDirection: 64.26,
+            swellHeight: 0.15,
+            swellPeriod: 13.89,
+            time: '2020-04-26T00:00:00+00:00',
+            waveDirection: 231.38,
+            waveHeight: 2.07,
+            windDirection: 299.45,
+            windSpeed: 100,
+          },
+        ],
+      },
+    ];
+    const forecast = new Forecast(mockedStormGlassService);
+    const beachesWithRating = await forecast.processForecastForBeaches(
+      defaultBeaches,
+      'desc',
+      'lng'
+    );
+    expect(beachesWithRating).toEqual(expectedResponse);
+  });
+
   it('should return the forecast for a list of beaches', async () => {
     mockedStormGlassService.fetchPoints.mockResolvedValue(
       stormGlassNormalizedResponseFixture
     );
-    const beaches: Beach[] = [
+    const beaches: ExistingBeach[] = [
       {
+        id: 'fake-id1',
         lat: -33.792726,
         lng: 151.289824,
         name: 'Manly',
-        position: BeachPosition.E,
-        user: 'some-id',
+        position: GeoPosition.E,
+        userId: 'fake-id',
       },
     ];
     const expectedResponse = [
@@ -33,7 +332,7 @@ describe('Forecast Service', () => {
             lng: 151.289824,
             name: 'Manly',
             position: 'E',
-            rating: 1,
+            rating: 2,
             swellDirection: 64.26,
             swellHeight: 0.15,
             swellPeriod: 3.89,
@@ -53,7 +352,7 @@ describe('Forecast Service', () => {
             lng: 151.289824,
             name: 'Manly',
             position: 'E',
-            rating: 1,
+            rating: 2,
             swellDirection: 123.41,
             swellHeight: 0.21,
             swellPeriod: 3.67,
@@ -73,7 +372,7 @@ describe('Forecast Service', () => {
             lng: 151.289824,
             name: 'Manly',
             position: 'E',
-            rating: 1,
+            rating: 2,
             swellDirection: 182.56,
             swellHeight: 0.28,
             swellPeriod: 3.44,
@@ -98,13 +397,14 @@ describe('Forecast Service', () => {
   });
 
   it('should throw internal processing error when something goes wrong during the rating process', async () => {
-    const beaches: Beach[] = [
+    const beaches: ExistingBeach[] = [
       {
+        id: 'fake-id1',
         lat: -33.792726,
         lng: 151.289824,
         name: 'Manly',
-        position: BeachPosition.E,
-        user: 'some-id',
+        position: GeoPosition.E,
+        userId: 'fake-id',
       },
     ];
     mockedStormGlassService.fetchPoints.mockRejectedValue(
